@@ -4,6 +4,7 @@
 
 tmp/
 build/
+build_check/
 
 *.txt
 *.log
