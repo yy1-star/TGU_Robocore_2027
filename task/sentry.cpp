@@ -2,11 +2,7 @@
 // Created by tgu on 2026/5/20.
 //
 
-#include "tools/BS_thread_pool.hpp"
-#include "tools/concurrentqueue.hpp"
-#include "tools/foxglove_comm.hpp"
 #include "tools/logger.hpp"
-#include "tools/tomlpp.hpp"
 #include "io/hikrobot/hikrobot.hpp"
 
 #include <opencv2/opencv.hpp>
@@ -18,7 +14,6 @@
 #include <memory>
 #include <thread>
 
-#include "tools/time.hpp"
 #include "app/auto_aim/auto_aim.hpp"
 
 // 配置文件路径
@@ -113,63 +108,11 @@ void auto_aim_thread() {
     }
 }
 
-// foxglove调试线程
-void foxglove_thread() {
-    tools::FoxGloveComm comm("0.0.0.0", 8765);
-
-    if (!comm.is_ok()) {
-        LOG_ERROR(MODULE, "foxglove server init failed");
-        return;
-    }
-
-    comm.create_image_channel("/raw_image");
-    comm.create_float_channel("/test");
-
-    // 两个常驻任务分别负责图像和数据发布，互不阻塞。
-    BS::thread_pool foxglove_pool(2);
-
-    foxglove_pool.detach_task([&comm] {
-        while (running) {
-            auto frame_ = frame.load();
-
-            if (frame_) {
-                try {
-                    cv::Mat resized;
-                    cv::resize(frame_->image, resized, cv::Size(), 0.5, 0.5, cv::INTER_AREA);
-                    comm.publish_image("/raw_image", resized, frame_->timestamp_ns, "camera_raw_frame");
-                } catch (const std::exception &e) {
-                    LOG_ERROR(MODULE, "async image publish failed: {}", e.what());
-                } catch (...) {
-                    LOG_ERROR(MODULE, "async image publish failed: unknown exception");
-                }
-            }
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-    });
-
-    foxglove_pool.detach_task([&comm] {
-        while (running) {
-            const uint64_t timestamp_ns = tools::steady_time_ns();
-            const float value = static_cast<float>(std::sin(6.283 * static_cast<double>(timestamp_ns) * 1e-9));
-
-            comm.publish_float("/test", value, timestamp_ns);
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
-    });
-
-    while (running) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
-}
-
 int main() {
     tools::Logger::instance().init(cfg);
 
     std::jthread camera(camera_thread);
     std::jthread auto_aim_worker(auto_aim_thread);
-    std::jthread foxglove(foxglove_thread);
 
     while (running) {
         std::this_thread::sleep_for(std::chrono::seconds(1));

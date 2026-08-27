@@ -22,21 +22,13 @@ Target::Target(
       timestamp_(timestamp),
       valid_(true) {
     const auto center_yaw = armor.yaw;
-    const Eigen::VectorXd initial_state{
-        armor.position_world.x() + radius * std::cos(center_yaw),
-        0.0,
-        armor.position_world.y() + radius * std::sin(center_yaw),
-        0.0,
-        armor.position_world.z(),
-        0.0,
-        center_yaw,
-        0.0,
-        radius,
-        0.0,
-        0.0};
+    Eigen::VectorXd initial_state(11);
+    initial_state << armor.position_world.x() + radius * std::cos(center_yaw), 0.0,
+        armor.position_world.y() + radius * std::sin(center_yaw), 0.0, armor.position_world.z(),
+        0.0, center_yaw, 0.0, radius, 0.0, 0.0;
 
     auto x_add = [](const Eigen::VectorXd& first, const Eigen::VectorXd& second) {
-        auto result = first + second;
+        Eigen::VectorXd result = first + second;
         result[6] = tools::limit_rad(result[6]);
         return result;
     };
@@ -131,7 +123,9 @@ std::vector<Eigen::Vector4d> Target::armor_xyza_list() const {
         const auto angle = tools::limit_rad(
             ekf_.x[6] + index * 2.0 * CV_PI / static_cast<double>(armor_count_));
         const auto xyz = armor_xyz(ekf_.x, index);
-        result.push_back({xyz.x(), xyz.y(), xyz.z(), angle});
+        Eigen::Vector4d entry;
+        entry << xyz.x(), xyz.y(), xyz.z(), angle;
+        result.push_back(entry);
     }
     return result;
 }
@@ -146,7 +140,9 @@ Eigen::Vector4d Target::predict_armor(double dt, int index) const {
     const auto angle = tools::limit_rad(
         state[6] + index * 2.0 * CV_PI / static_cast<double>(armor_count_));
     const auto xyz = armor_xyz(state, index);
-    return {xyz.x(), xyz.y(), xyz.z(), angle};
+    Eigen::Vector4d result;
+    result << xyz.x(), xyz.y(), xyz.z(), angle;
+    return result;
 }
 
 bool Target::diverged() const {
@@ -169,21 +165,22 @@ void Target::update_measurement(const Armor& armor, int id) {
     const auto jacobian = armor_jacobian(ekf_.x, id);
     const auto center_yaw = std::atan2(armor.position_world.y(), armor.position_world.x());
     const auto delta_angle = tools::limit_rad(armor.yaw - center_yaw);
-    const Eigen::VectorXd measurement{
-        armor.ypd_world.x(), armor.ypd_world.y(), armor.ypd_world.z(), armor.yaw};
-    const Eigen::VectorXd noise_diagonal{
-        4e-3, 4e-3, std::log(std::abs(delta_angle) + 1.0) + 1.0,
-        std::log(std::abs(armor.ypd_world.z()) + 1.0) / 200.0 + 9e-2};
+    Eigen::VectorXd measurement(4);
+    measurement << armor.ypd_world.x(), armor.ypd_world.y(), armor.ypd_world.z(), armor.yaw;
+    Eigen::VectorXd noise_diagonal(4);
+    noise_diagonal << 4e-3, 4e-3, std::log(std::abs(delta_angle) + 1.0) + 1.0,
+        std::log(std::abs(armor.ypd_world.z()) + 1.0) / 200.0 + 9e-2;
     const auto measurement_noise = noise_diagonal.asDiagonal();
 
     const auto measurement_function = [this, id](const Eigen::VectorXd& state) {
         const auto ypd = tools::xyz2ypd(armor_xyz(state, id));
-        return Eigen::Vector4d{
-            ypd.x(), ypd.y(), ypd.z(),
-            tools::limit_rad(state[6] + id * 2.0 * CV_PI / armor_count_)};
+        Eigen::VectorXd result(4);
+        result << ypd.x(), ypd.y(), ypd.z(),
+            tools::limit_rad(state[6] + id * 2.0 * CV_PI / armor_count_);
+        return result;
     };
     const auto subtract = [](const Eigen::VectorXd& first, const Eigen::VectorXd& second) {
-        auto result = first - second;
+        Eigen::VectorXd result = first - second;
         result[0] = tools::limit_rad(result[0]);
         result[1] = tools::limit_rad(result[1]);
         result[3] = tools::limit_rad(result[3]);
@@ -198,10 +195,9 @@ Eigen::Vector3d Target::armor_xyz(const Eigen::VectorXd& state, int id) const {
     const auto use_long_radius = armor_count_ == 4 && (id == 1 || id == 3);
     const auto radius = use_long_radius ? state[8] + state[9] : state[8];
     const auto height = use_long_radius ? state[4] + state[10] : state[4];
-    return {
-        state[0] - radius * std::cos(angle),
-        state[2] - radius * std::sin(angle),
-        height};
+    Eigen::Vector3d result;
+    result << state[0] - radius * std::cos(angle), state[2] - radius * std::sin(angle), height;
+    return result;
 }
 
 Eigen::MatrixXd Target::armor_jacobian(const Eigen::VectorXd& state, int id) const {

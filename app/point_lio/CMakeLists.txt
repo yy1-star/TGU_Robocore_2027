@@ -8,6 +8,8 @@ add_library(point_lio STATIC
 target_include_directories(point_lio
     PUBLIC
         ${PROJECT_SOURCE_DIR}
+        ${PROJECT_SOURCE_DIR}/app/point_lio/third_party/point_lio/include
+        ${PROJECT_SOURCE_DIR}/app/point_lio/third_party/point_lio/src
         ${PCL_INCLUDE_DIRS}
 )
 

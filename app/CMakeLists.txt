@@ -23,4 +23,4 @@ target_link_libraries(app_auto_aim
         tools
 )
 
-add_subdirectory(point_lio)
+add_subdirectory(point_lio EXCLUDE_FROM_ALL)

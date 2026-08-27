@@ -93,11 +93,11 @@ std::vector<cv::Point2f> Solver::reproject_armor(
         sin_yaw * cos_pitch, cos_yaw, sin_yaw * sin_pitch,
         -sin_pitch, 0.0, cos_pitch;
 
-    const auto armor_to_camera =
+    Eigen::Matrix3d armor_to_camera =
         config_.camera_to_gimbal.transpose() * gimbal_to_world_.transpose() * armor_to_world;
-    const auto armor_position_camera = config_.camera_to_gimbal.transpose() *
-                                       (gimbal_to_world_.transpose() * position_world -
-                                        config_.camera_to_gimbal_translation);
+    Eigen::Vector3d armor_position_camera = config_.camera_to_gimbal.transpose() *
+        (gimbal_to_world_.transpose() * position_world -
+         config_.camera_to_gimbal_translation);
 
     cv::Mat rotation_camera;
     cv::eigen2cv(armor_to_camera, rotation_camera);
