@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <numeric>
 #include <utility>
 
@@ -69,11 +70,11 @@ void Target::predict(double dt) {
     process_noise(7, 6) = b * angular_variance;
     process_noise(7, 7) = c * angular_variance;
 
-    const auto state_function = [transition](const Eigen::VectorXd& state) {
-        auto result = transition * state;
+    std::function<Eigen::VectorXd(const Eigen::VectorXd&)> state_function([transition](const Eigen::VectorXd& state) -> Eigen::VectorXd {
         Eigen::VectorXd result = transition * state;
+        result[6] = tools::limit_rad(result[6]);
         return result;
-    };
+    });
     ekf_.predict(transition, process_noise, state_function);
 
     if (converged() && name == ArmorName::outpost && std::abs(ekf_.x[7]) > 2.0) {
