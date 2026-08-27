@@ -71,7 +71,7 @@ void Target::predict(double dt) {
 
     const auto state_function = [transition](const Eigen::VectorXd& state) {
         auto result = transition * state;
-        result[6] = tools::limit_rad(result[6]);
+        Eigen::VectorXd result = transition * state;
         return result;
     };
     ekf_.predict(transition, process_noise, state_function);
