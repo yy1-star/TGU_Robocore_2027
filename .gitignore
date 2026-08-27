@@ -8,3 +8,6 @@ build_check/
 
 *.txt
 *.log
+
+!tools/CMakeLists.txt
+!app/point_lio/CMakeLists.txt
