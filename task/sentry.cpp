@@ -19,6 +19,7 @@
 #include <thread>
 
 #include "tools/time.hpp"
+#include "app/auto_aim/auto_aim.hpp"
 
 // 配置文件路径
 const auto CONFIG_PATH = "../config/sentry.toml";
@@ -78,6 +79,40 @@ void camera_thread() {
     LOG_INFO(MODULE, "Camera thread stopped");
 }
 
+// 自瞄处理线程。当前仓库还没有云台通信接口，因此这里只生成并记录瞄准命令。
+void auto_aim_thread() {
+    app::auto_aim::AutoAim auto_aim(CONFIG_PATH);
+    std::string previous_state;
+
+    while (running) {
+        const auto frame_ = frame.load();
+        if (!frame_) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            continue;
+        }
+
+        const auto result = auto_aim.process(
+            frame_->image,
+            std::chrono::steady_clock::now(),
+            Eigen::Matrix3d::Identity(),
+            23.0);
+        const auto state = auto_aim.state();
+        if (state != previous_state) {
+            LOG_INFO(MODULE, "auto aim state: {}", state);
+            previous_state = state;
+        }
+        if (result.command.valid) {
+            LOG_DEBUG(
+                MODULE,
+                "auto aim command yaw={:.4f}, pitch={:.4f}, fire={}",
+                result.command.yaw,
+                result.command.pitch,
+                result.command.fire);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+}
+
 // foxglove调试线程
 void foxglove_thread() {
     tools::FoxGloveComm comm("0.0.0.0", 8765);
@@ -133,6 +168,7 @@ int main() {
     tools::Logger::instance().init(cfg);
 
     std::jthread camera(camera_thread);
+    std::jthread auto_aim_worker(auto_aim_thread);
     std::jthread foxglove(foxglove_thread);
 
     while (running) {

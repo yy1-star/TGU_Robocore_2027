@@ -14,14 +14,32 @@ int main(int argc, char** argv) {
     cv::rectangle(image, {368, 180}, {380, 260}, {255, 0, 0}, cv::FILLED);
 
     app::auto_aim::AutoAim auto_aim(argv[1]);
+    const auto timestamp = std::chrono::steady_clock::now();
     const auto result = auto_aim.process(
         image,
-        std::chrono::steady_clock::now(),
+        timestamp,
         Eigen::Matrix3d::Identity(),
         23.0);
 
     assert(result.armors.size() == 1);
     assert(result.target.has_value());
     assert(result.command.valid);
+    assert(auto_aim.state() == "detecting");
+
+    const auto tracking_result = auto_aim.process(
+        image,
+        timestamp + std::chrono::milliseconds(20),
+        Eigen::Matrix3d::Identity(),
+        23.0);
+    assert(tracking_result.target.has_value());
+    assert(auto_aim.state() == "tracking");
+
+    const auto lost_result = auto_aim.process(
+        cv::Mat::zeros(image.size(), image.type()),
+        timestamp + std::chrono::milliseconds(40),
+        Eigen::Matrix3d::Identity(),
+        23.0);
+    assert(lost_result.target.has_value());
+    assert(auto_aim.state() == "temp_lost");
     return 0;
 }
